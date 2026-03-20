@@ -1,6 +1,6 @@
 # Sistema de Controle de Uso de Veículo com RFID
 
-## Instituto Federal de São Paulo, Campos Catanduva – IFSP  
+## Instituto Federal de São Paulo, Campus Catanduva – IFSP  
 **Curso:** CTD.LAT.ICS.2020 - ESPECIALIZAÇÃO EM INTERNET DAS COISAS  
 **Aluno:** Matheus Edilson dos Santos  
 **Matrícula:** CT3062031  
@@ -185,4 +185,4 @@ A solução atende ao objetivo acadêmico proposto e pode ser expandida futurame
 **Matheus Edilson dos Santos**  
 **Matrícula:** CT3062031  
 **Curso:** CTD.LAT.ICS.2020 - ESPECIALIZAÇÃO EM INTERNET DAS COISAS  
-**Instituição:** Instituto Federal de São Paulo, Campos Catanduva – IFSP
+**Instituição:** Instituto Federal de São Paulo, Campus Catanduva – IFSP
