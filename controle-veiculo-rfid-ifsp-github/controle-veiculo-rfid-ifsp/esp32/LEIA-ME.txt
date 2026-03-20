@@ -1,0 +1,3 @@
+Adicione aqui o arquivo final do ESP32-S3 usado no projeto (ex.: usuarios_carro.ino).
+Este pacote foi gerado a partir da documentação e capturas fornecidas na conversa.
+Como o código-fonte completo final não foi anexado como arquivo nesta conversa, o repositório foi montado com a documentação pronta e a estrutura para inclusão do código definitivo.

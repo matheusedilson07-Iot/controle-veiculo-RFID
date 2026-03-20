@@ -1,0 +1,2 @@
+Adicione aqui o arquivo JSON exportado do fluxo do Node-RED (ex.: flow.json).
+Este pacote foi gerado com a documentação pronta e a estrutura do repositório.
