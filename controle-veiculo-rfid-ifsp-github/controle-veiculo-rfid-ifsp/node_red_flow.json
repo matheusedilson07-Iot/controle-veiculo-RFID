@@ -1,0 +1,529 @@
+[
+    {
+        "id": "tab_controle_veiculo_mqtt_v2",
+        "type": "tab",
+        "label": "Controle Veiculo MQTT",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "mqtt_in_eventos_v2",
+        "type": "mqtt in",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Receber eventos ESP32",
+        "topic": "veiculo/acesso/eventos",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "mqtt_broker_aws_v2",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 120,
+        "wires": [
+            [
+                "fn_processa_evento_v2",
+                "debug_payload_bruto_v2"
+            ]
+        ]
+    },
+    {
+        "id": "debug_payload_bruto_v2",
+        "type": "debug",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Debug payload bruto",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 430,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "fn_processa_evento_v2",
+        "type": "function",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Processa evento / guarda historico",
+        "func": "let events = global.get('vehicle_events') || [];\nlet stats = global.get('vehicle_stats') || {\n    total: 0,\n    autorizados: 0,\n    nao_autorizados: 0,\n    timeout: 0,\n    start_requested: 0,\n    manual_reset: 0\n};\n\nlet p = msg.payload;\n\nif (typeof p === 'string') {\n    try {\n        p = JSON.parse(p);\n    } catch (e) {\n        node.warn('Payload nao e JSON valido: ' + p);\n        return null;\n    }\n}\n\nif (!p || typeof p !== 'object') {\n    node.warn('Payload invalido');\n    return null;\n}\n\nif (!p.event_type && !p.driver_name && !p.uid && !p.timestamp) {\n    node.warn('Payload vazio ou incompleto');\n    return null;\n}\n\nlet item = {\n    datetime: p.timestamp || '',\n    device: p.device || '',\n    driver_name: p.driver_name || '',\n    uid: p.uid || '',\n    event_type: p.event_type || '',\n    status: p.status || '',\n    ip: p.ip || '',\n    timestamp_valid: p.timestamp_valid === true ? 'sim' : 'nao'\n};\nlet lastEvent = events.length > 0 ? events[events.length - 1] : null;\n\nif (\n    lastEvent &&\n    lastEvent.datetime === item.datetime &&\n    lastEvent.driver_name === item.driver_name &&\n    lastEvent.uid === item.uid &&\n    lastEvent.event_type === item.event_type &&\n    lastEvent.status === item.status\n) {\n    return null;\n}\nevents.push(item);\n\nlet now = Date.now();\nlet limit = now - (7 * 24 * 60 * 60 * 1000);\n\nevents = events.filter(e => {\n    let t = Date.parse(e.datetime);\n    if (isNaN(t)) return true;\n    return t >= limit;\n});\n\n// recalcula tudo baseado no histórico\nstats.total = events.length;\nstats.autorizados = 0;\nstats.nao_autorizados = 0;\nstats.timeout = 0;\nstats.start_requested = 0;\nstats.manual_reset = 0;\n\nfor (let e of events) {\n    switch (e.event_type) {\n        case 'authorized':\n            stats.autorizados++;\n            break;\n        case 'unauthorized_card':\n            stats.nao_autorizados++;\n            break;\n        case 'timeout':\n            stats.timeout++;\n            break;\n        case 'start_requested':\n            stats.start_requested++;\n            break;\n        case 'manual_reset':\n            stats.manual_reset++;\n            break;\n    }\n}\nglobal.set('vehicle_events', events);\nglobal.set('vehicle_stats', stats);\nglobal.set('vehicle_last_event', item);\n\nreturn [\n    { payload: events },\n    { payload: stats.total },\n    { payload: stats.autorizados },\n    { payload: stats.nao_autorizados },\n    { payload: stats.timeout },\n    { payload: item },\n    { payload: stats.start_requested },\n    { payload: stats.manual_reset }\n];",
+        "outputs": 8,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 180,
+        "wires": [
+            [
+                "ui_table_historico_v2"
+            ],
+            [
+                "ui_text_total_v2"
+            ],
+            [
+                "ui_text_autorizados_v2"
+            ],
+            [
+                "ui_text_nao_autorizados_v2"
+            ],
+            [
+                "ui_text_timeout_v2"
+            ],
+            [
+                "tmpl_ultimo_evento_v2"
+            ],
+            [
+                "ui_text_starts_v2"
+            ],
+            [
+                "ui_text_resets_v2"
+            ]
+        ]
+    },
+    {
+        "id": "ui_text_total_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 1,
+        "width": "4",
+        "height": "1",
+        "name": "Total",
+        "label": "Total de eventos",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 830,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "ui_text_autorizados_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 2,
+        "width": "4",
+        "height": "1",
+        "name": "Autorizados",
+        "label": "Autorizados",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 850,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "ui_text_nao_autorizados_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 3,
+        "width": "4",
+        "height": "1",
+        "name": "Nao autorizados",
+        "label": "Cartoes invalidos",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 860,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "ui_text_timeout_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 4,
+        "width": "4",
+        "height": "1",
+        "name": "Timeout",
+        "label": "Timeouts",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 840,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "ui_text_starts_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 5,
+        "width": "4",
+        "height": "1",
+        "name": "Starts",
+        "label": "Pedidos de partida",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 830,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "ui_text_resets_v2",
+        "type": "ui_text",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "order": 6,
+        "width": "4",
+        "height": "1",
+        "name": "Resets",
+        "label": "Reinicios manuais",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#000000",
+        "x": 840,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "tmpl_ultimo_evento_v2",
+        "type": "ui_template",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_status_v2",
+        "name": "Ultimo evento",
+        "order": 7,
+        "width": "16",
+        "height": "6",
+        "format": "<div style=\"padding:10px;\">\n  <h3>Último evento</h3>\n\n  <p><b>Data/Hora:</b> {{msg.payload.datetime || '---'}}</p>\n  <p><b>Condutor:</b> {{msg.payload.driver_name || '---'}}</p>\n  <p><b>UID:</b> {{msg.payload.uid || '---'}}</p>\n  <p><b>Evento:</b> {{msg.payload.event_type || '---'}}</p>\n  <p><b>Status:</b> {{msg.payload.status || '---'}}</p>\n  <p><b>Dispositivo:</b> {{msg.payload.device || '---'}}</p>\n  <p><b>IP:</b> {{msg.payload.ip || '---'}}</p>\n</div>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 860,
+        "y": 400,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_table_historico_v2",
+        "type": "ui_table",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "group": "ui_group_historico_v2",
+        "name": "Tabela historico",
+        "order": 1,
+        "width": "16",
+        "height": "12",
+        "columns": [
+            {
+                "field": "datetime",
+                "title": "Data/Hora",
+                "width": "190",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "driver_name",
+                "title": "Condutor",
+                "width": "130",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "uid",
+                "title": "UID",
+                "width": "120",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "event_type",
+                "title": "Evento",
+                "width": "150",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "status",
+                "title": "Status",
+                "width": "220",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "device",
+                "title": "Dispositivo",
+                "width": "150",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "ip",
+                "title": "IP",
+                "width": "130",
+                "align": "left",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            },
+            {
+                "field": "timestamp_valid",
+                "title": "Hora NTP OK",
+                "width": "100",
+                "align": "center",
+                "formatter": "plaintext",
+                "formatterParams": {
+                    "target": "_blank"
+                }
+            }
+        ],
+        "outputs": 0,
+        "cts": false,
+        "x": 860,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "inject_load_history_v2",
+        "type": "inject",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Carregar dashboard ao iniciar",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "2",
+        "topic": "",
+        "payload": "load",
+        "payloadType": "str",
+        "x": 170,
+        "y": 340,
+        "wires": [
+            [
+                "fn_load_history_v2"
+            ]
+        ]
+    },
+    {
+        "id": "fn_load_history_v2",
+        "type": "function",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Carregar historico e stats",
+        "func": "let events = global.get('vehicle_events') || [];\nlet stats = global.get('vehicle_stats') || {\n    total: 0,\n    autorizados: 0,\n    nao_autorizados: 0,\n    timeout: 0,\n    start_requested: 0,\n    manual_reset: 0\n};\nlet last = global.get('vehicle_last_event') || {\n    datetime: '',\n    driver_name: '',\n    uid: '',\n    event_type: '',\n    status: '',\n    device: '',\n    ip: '',\n    timestamp_valid: ''\n};\n\nreturn [\n    { payload: events },\n    { payload: stats.total },\n    { payload: stats.autorizados },\n    { payload: stats.nao_autorizados },\n    { payload: stats.timeout },\n    { payload: last },\n    { payload: stats.start_requested },\n    { payload: stats.manual_reset }\n];",
+        "outputs": 8,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 340,
+        "wires": [
+            [
+                "ui_table_historico_v2"
+            ],
+            [
+                "ui_text_total_v2"
+            ],
+            [
+                "ui_text_autorizados_v2"
+            ],
+            [
+                "ui_text_nao_autorizados_v2"
+            ],
+            [
+                "ui_text_timeout_v2"
+            ],
+            [
+                "tmpl_ultimo_evento_v2"
+            ],
+            [
+                "ui_text_starts_v2"
+            ],
+            [
+                "ui_text_resets_v2"
+            ]
+        ]
+    },
+    {
+        "id": "inject_reset_memoria_v2",
+        "type": "inject",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Resetar memoria",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "reset",
+        "payloadType": "str",
+        "x": 120,
+        "y": 500,
+        "wires": [
+            [
+                "fn_reset_memoria_v2"
+            ]
+        ]
+    },
+    {
+        "id": "fn_reset_memoria_v2",
+        "type": "function",
+        "z": "tab_controle_veiculo_mqtt_v2",
+        "name": "Limpar memoria global",
+        "func": "global.set('vehicle_events', []);\nglobal.set('vehicle_stats', {\n    total: 0,\n    autorizados: 0,\n    nao_autorizados: 0,\n    timeout: 0,\n    start_requested: 0,\n    manual_reset: 0\n});\nglobal.set('vehicle_last_event', {\n    datetime: '',\n    driver_name: '',\n    uid: '',\n    event_type: '',\n    status: '',\n    device: '',\n    ip: '',\n    timestamp_valid: ''\n});\n\nreturn [\n    { payload: [] },\n    { payload: 0 },\n    { payload: 0 },\n    { payload: 0 },\n    { payload: 0 },\n    { payload: {\n        datetime: '',\n        driver_name: '',\n        uid: '',\n        event_type: '',\n        status: '',\n        device: '',\n        ip: '',\n        timestamp_valid: ''\n    } },\n    { payload: 0 },\n    { payload: 0 }\n];",
+        "outputs": 8,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 500,
+        "wires": [
+            [
+                "ui_table_historico_v2"
+            ],
+            [
+                "ui_text_total_v2"
+            ],
+            [
+                "ui_text_autorizados_v2"
+            ],
+            [
+                "ui_text_nao_autorizados_v2"
+            ],
+            [
+                "ui_text_timeout_v2"
+            ],
+            [
+                "tmpl_ultimo_evento_v2"
+            ],
+            [
+                "ui_text_starts_v2"
+            ],
+            [
+                "ui_text_resets_v2"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt_broker_aws_v2",
+        "type": "mqtt-broker",
+        "name": "Mosquitto AWS",
+        "broker": "3.143.217.29",
+        "port": "1883",
+        "clientid": "NodeRED_Veiculo_Dashboard_V2",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "veiculo/acesso/status/nodered",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "online",
+        "closeTopic": "veiculo/acesso/status/nodered",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "offline",
+        "willTopic": "veiculo/acesso/status/nodered",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "offline",
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ui_group_status_v2",
+        "type": "ui_group",
+        "name": "Status",
+        "tab": "ui_tab_veiculo_mqtt_v2",
+        "order": 1,
+        "disp": true,
+        "width": "16",
+        "collapse": false
+    },
+    {
+        "id": "ui_group_historico_v2",
+        "type": "ui_group",
+        "name": "Historico Semanal",
+        "tab": "ui_tab_veiculo_mqtt_v2",
+        "order": 2,
+        "disp": true,
+        "width": "16",
+        "collapse": false
+    },
+    {
+        "id": "ui_tab_veiculo_mqtt_v2",
+        "type": "ui_tab",
+        "name": "Controle Veiculo",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "1301a169295b5cef",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6",
+            "node-red-node-ui-table": "0.4.5"
+        }
+    }
+]
